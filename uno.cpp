@@ -533,18 +533,26 @@ void cpuTurn(int currentPlayer, Card &lastPlayedCard, bool &canRespond, int &pot
 }
 
 void botModeSpectate(vector<Player> players) {
-
+	Player leadingPlayer = players[0];
+	int min = leadingPlayer.hand.size();
 	cout << "| CURRENT HAND SIZES |" << endl;
 	for (auto player : players) {
 		cout << player.Name << ": " << player.hand.size() << endl;
 	}
 	cout << "\n\n-----------------------";
 	for (auto player : players) {
+		if (player.hand.size() < min) {
+			leadingPlayer = player;
+		}
 		cout << "\nHand of " << player.Name << endl;
 		for (auto cards : player.hand) {
 			displayCard(cards);
 		}
+		cout << endl;
 	}
+
+	cout << "Current leading player: " << leadingPlayer.Name << "!\n";
+
 	cout << "\n\n-----------------------\n";
 
 }
@@ -579,18 +587,6 @@ Card initRound(string& playerName, int& playerCount, vector<Player>& players, ve
 		while (firstCard.isSpecial) {
 			firstCard = draw(deck, discardPile, discardPile);
 		}
-		//switch (firstCard.rank) {
-		//case(drawTwo):
-		//	potentialDraw += 2;
-		//	break;
-		//case(wildCard):
-		//	firstCard.color = getRandomColor();
-		//	break;
-		//case(wildDrawFour):
-		//	firstCard.color = getRandomColor();
-		//	potentialDraw += 4;
-		//	break;
-		//}
 	}
 	firstCard.status = played;
 	return firstCard;

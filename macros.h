@@ -30,6 +30,7 @@
 #define userPlayer false
 #define botPlayer true
 #define DEV_MODE 'D'
+#define BOT_MODE_CODE
 bool devMode = false;
 bool botMode = false;
 #define HUMAN (0)
