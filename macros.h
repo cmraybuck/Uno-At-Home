@@ -30,5 +30,6 @@
 #define userPlayer false
 #define botPlayer true
 #define DEV_MODE 'D'
-
 bool devMode = false;
+#define HUMAN (0)
+#define STARTING_HAND_SIZE (7)
