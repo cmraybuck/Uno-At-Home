@@ -4,8 +4,10 @@
 #include <string>
 #include <algorithm>
 #include "macros.h"
+#include <chrono>
+#include <thread>
 using namespace std;
-
+using namespace chrono_literals;
 string colors = "RGBY";
 
 // Red, Yellow, Green, Blue
@@ -57,13 +59,11 @@ public:
 	string Name;
 	bool isCPU;
 	vector<Card> hand;
-
 	Player(string whatName, bool whatType)
 	{
 		Name = whatName;
 		isCPU = whatType;
 	}
-
 	~Player()
 	{
 		//cout << "Destructor called" << endl; 
@@ -171,7 +171,7 @@ void displayCard(Card card) {
 	cout << "]" << RESET_TEXT;
 }
 
-void reshuffle(vector<Card>& deck, vector<Card>& discardPile) {
+void reshuffle(vector<Card> &deck, vector<Card> &discardPile) {
 	if (discardPile.size() <= 1) {
 		return;
 	}
@@ -189,7 +189,7 @@ void reshuffle(vector<Card>& deck, vector<Card>& discardPile) {
 	random_device rd;
 	mt19937 g(rd());
 	shuffle(deck.begin(), deck.end(), g);
-	cout << "\nDiscard pile shuffled into deck (debug)\n" << endl;
+	cout << "\n| Discard pile shuffled into deck |\n" << endl;
 }
 
 Card draw(vector<Card>& deck, vector<Card>& hand, vector<Card>& discardPile) {
@@ -206,24 +206,29 @@ void dealCards(vector<Card>& deck, Player& humanPlayer, vector<Player>& players,
 	
 	if (devMode) {
 		Card devWildCard = Card(wildCard, WILD_COLOR, wild, special, notPlayed);
-		//Card devWildDrawFour = Card(wildDrawFour, WILD_COLOR, wild, special, notPlayed);
-		//Card devDrawTwo = Card(drawTwo, BLUE, notWild, special, notPlayed);
+		Card devWildDrawFour = Card(wildDrawFour, WILD_COLOR, wild, special, notPlayed);
+		Card devDrawTwo = Card(drawTwo, BLUE, notWild, special, notPlayed);
 		for (int i = 0; i < STARTING_HAND_SIZE; i++) {
-			humanPlayer.hand.push_back(devWildCard);
-			//humanPlayer.hand.push_back(devDrawTwo);
+			humanPlayer.hand.push_back(devWildDrawFour);
 		}
-		
+		for (int x = 0; x < numOpp; x++) {
+			for (int i = 0; i < STARTING_HAND_SIZE; i++) {
+				//players[x + 1].hand.push_back(devWildDrawFour);
+				draw(deck, players[x + 1].hand, discardPile);
+			}
+		}
 	}
 	else {
 		for (int i = 0; i < STARTING_HAND_SIZE; i++) {
 			draw(deck, humanPlayer.hand, discardPile);
 		}
-	}
-	for (int x = 0; x < numOpp; x++) {
-		for (int i = 0; i < STARTING_HAND_SIZE; i++) {
-			draw(deck, players[x + 1].hand, discardPile);
+		for (int x = 0; x < numOpp; x++) {
+			for (int i = 0; i < STARTING_HAND_SIZE; i++) {
+				draw(deck, players[x + 1].hand, discardPile);
+			}
 		}
 	}
+
 }
 
 bool isValidCard(Card card, Card lastPlayedCard) {
@@ -252,59 +257,21 @@ bool unoCheck(Player currentPlayer, bool& gamePower) {
 		cout << "UNO! " << currentPlayer.Name << " only needs to play one more card to win! " << endl;
 	}
 	else if (currentPlayer.hand.size() < UNO) {
-		if (!currentPlayer.isCPU) {
+		if (!currentPlayer.isCPU && !botMode) {
 			cout << "========================================" << endl;
-			cout << "       CONGRATULATIONS! YOU WIN!        \n";
+			cout << "              YOU WIN!                \n";
 			cout << "========================================" << endl;
 			gamePower = powerOff;
 		}
 		else {
-			cout << "========================================" << endl;
-			cout << "    CPU WINS! BETTER LUCK NEXT TIME!  \n";
+			cout << "========================================" << endl;          
+			cout << "              " << currentPlayer.Name << " WINS!      \n";
 			cout << "========================================" << endl;
 			gamePower = powerOff;
 		}
 
 	}
 	return gamePower;
-}
-
-Card initRound(string &playerName, int &playerCount, vector<Player> &players, vector<Card>& deck, vector<Card>& discardPile, int &potentialDraw) {
-	cout << "Enter your name: ";
-	while (!(cin >> playerName))
-	{
-		cout << "Invalid input. Try again with a valid name";
-		cin.clear();
-		cin.ignore(10000, '\n');
-	}
-
-	cout << "Enter the total amount of opponents you want" << endl;
-	while (!(cin >> playerCount))
-	{
-		cout << "Invalid input. Try again with ";
-		cin.clear();
-		cin.ignore(10000, '\n');
-	}
-	clearScreen();
-	cout << "A total of " << playerCount + 1 << " players are competing. Good luck!\n" << endl;
-
-	initPlayers(players, playerName, playerCount);
-	dealCards(deck, players[0], players, playerCount, discardPile);
-	Card lastPlayedCard = draw(deck, discardPile, discardPile);
-	lastPlayedCard.status = played;
-	switch (lastPlayedCard.rank) {
-	case(drawTwo):
-		potentialDraw += 2;
-		break;
-	case(wildCard):
-		lastPlayedCard.color = getRandomColor();
-		break;
-	case(wildDrawFour):
-		lastPlayedCard.color = getRandomColor();
-		potentialDraw += 4;
-		break;
-	}
-	return lastPlayedCard;
 }
 
 void welcomeScreen() {
@@ -327,10 +294,10 @@ void welcomeScreen() {
 }
 
 void topDiscardInfo(Card lastPlayedCard, int potentialDraw, bool canRespond) {
-	cout << endl << "Current Card: ";
+	cout << endl << "Last played card: ";
 	displayCard(lastPlayedCard);
 	if (lastPlayedCard.isWild) {
-		cout << "\nWild card color: " << lastPlayedCard.GetColor(lastPlayedCard.color);
+		cout << "\nCard color: " << lastPlayedCard.GetColor(lastPlayedCard.color);
 	}
 	if (canRespond) {
 		switch (lastPlayedCard.rank) {
@@ -362,12 +329,14 @@ void wildCardLogic(Player player, Card &playedCard, string colors, string &wildC
 }
 
 void specialCardLogic(Card playedCard, int &turnCount, int &iterator, int &potentialDraw, vector<Player> &players,
-						int &nextPlayer, bool &canRespond, vector<Card> &deck, vector<Card> &discardPile) {
+						int &nextPlayer, bool &canRespond, vector<Card> &deck, vector<Card> &discardPile, int currentPlayer) {
 	switch (playedCard.rank) {
 	case(skip): // Increment iterator so next player is skipped
 		turnCount += iterator;
+		cout << players[currentPlayer].Name << " has skipped " << players[nextPlayer].Name << "'s turn! \n";
 		break;
 	case(reverse): // Reverse turn order iterator
+		cout << players[currentPlayer].Name << " has reversed the turn order!\n";
 		iterator *= -1;
 		break;
 	case(drawTwo): // Force other player to draw two cards unless they can stack a draw 2. If they draw, the turn is skipped.
@@ -379,7 +348,7 @@ void specialCardLogic(Card playedCard, int &turnCount, int &iterator, int &poten
 			}
 		}
 		if (!canRespond) {
-			cout << endl << players[nextPlayer - iterator].Name << " played a draw 2 on " << players[nextPlayer].Name << "! " << players[nextPlayer].Name << " does not have a card to stack and has drawn " << potentialDraw << " cards and lost their turn for this round.\n";
+			cout << endl << players[currentPlayer].Name << " played a draw 2 on " << players[nextPlayer].Name << "! \n" << players[nextPlayer].Name << " does not have a card to stack and has drawn " << potentialDraw << " cards and lost their turn for this round.\n";
 			canRespond = false;
 			for (int i = 0; i < potentialDraw; i++) {
 				draw(deck, players[nextPlayer].hand, discardPile);
@@ -397,7 +366,7 @@ void specialCardLogic(Card playedCard, int &turnCount, int &iterator, int &poten
 			}
 		}
 		if (!canRespond) {
-			cout << endl << players[nextPlayer - iterator].Name << " played a draw 4 on " << players[nextPlayer].Name << "! " << players[nextPlayer].Name << " does not have a card to stack and has drawn " << potentialDraw << " cards and lost their turn for this round.\n";
+			cout << endl << players[currentPlayer].Name << " played a draw 4 on " << players[nextPlayer].Name << "! \n" << players[nextPlayer].Name << " does not have a card to stack and has drawn " << potentialDraw << " cards and lost their turn for this round.\n";
 			canRespond = false;
 			for (int i = 0; i < potentialDraw; i++) {
 				draw(deck, players[nextPlayer].hand, discardPile);
@@ -423,7 +392,7 @@ void playerCardLogic(vector<Player> &players, string colors, Card &playedCard,
 		wildCardLogic(players[0], playedCard, colors, wildColor);
 	}
 	if (playedCard.isSpecial) {
-		specialCardLogic(playedCard, turnCount, iterator, potentialDraw, players, nextPlayer, canRespond, deck, discardPile);
+		specialCardLogic(playedCard, turnCount, iterator, potentialDraw, players, nextPlayer, canRespond, deck, discardPile, HUMAN);
 	}
 	discardPile.push_back(playedCard);
 	lastPlayedCard = playedCard;
@@ -431,7 +400,6 @@ void playerCardLogic(vector<Player> &players, string colors, Card &playedCard,
 
 void drawCardLogic(bool &canRespond, int &potentialDraw, vector<Card> &deck, vector<Player> &players, vector<Card> &discardPile, int currentPlayer) {
 	if (canRespond) {
-		cout << "Drawing multiple cards. potentialDraw val = " << potentialDraw << endl;
 		for (int i = 0; i < potentialDraw; i++) {
 			draw(deck, players[currentPlayer].hand, discardPile);
 		}
@@ -439,7 +407,6 @@ void drawCardLogic(bool &canRespond, int &potentialDraw, vector<Card> &deck, vec
 		canRespond = false;
 	}
 	else {
-		cout << "Drawing one card." << endl;
 		draw(deck, players[currentPlayer].hand, discardPile);
 	}
 }
@@ -449,7 +416,7 @@ void cpuTurn(int currentPlayer, Card &lastPlayedCard, bool &canRespond, int &pot
 	int RGBY[] = { 0, 0, 0, 0 };
 	int cardToPlay = 0;
 	int max = 0;
-	char preferredColor;
+	char preferredColor = getRandomColor();
 	bool hasValidCard = false;
 	for (auto card : players[currentPlayer].hand) {
 		switch (card.color) {
@@ -498,38 +465,36 @@ void cpuTurn(int currentPlayer, Card &lastPlayedCard, bool &canRespond, int &pot
 			break;
 		}
 	}
-	//cout << "CPU's preferred color is " << preferredColor << endl;
 
 	if (canRespond) { 
+		canRespond = false;
 		for (auto card : players[currentPlayer].hand) {
 			cardToPlay++;
 			if (card.rank == lastPlayedCard.rank) {
 				playedCard = card;
-				specialCardLogic(card, turnCount, iterator, potentialDraw, players, nextPlayer, canRespond, deck, discardPile);
+				specialCardLogic(card, turnCount, iterator, potentialDraw, players, nextPlayer, canRespond, deck, discardPile, currentPlayer);
+				if (playedCard.isWild) {
+					playedCard.color = preferredColor;
+				}
 				break;
 			}
 		}
-		canRespond = false;
 	}
 	else {
-		//cout << "Not can respond" << endl;
 		for (int i = 0; i < 3; i++) { // 3 steps of logic: 1. Do I have a color matching the current card? 2. Do I have a rank matching the current card? 3. Do I have a wild card?
 			for (auto card : players[currentPlayer].hand) {
 				cardToPlay++;
-				if (card.color == lastPlayedCard.color && !card.isWild && i == 0) { // Matching color, not necessarily matching rank, not wild
-					//cout << "Rule 1\n";
+				if (card.color == lastPlayedCard.color && !card.isWild && i == 0) { // Rule 1: Matching color, not necessarily matching rank, not wild
 					hasValidCard = true;
 					playedCard = card;
 					break;
 				}
-				else if (card.rank == lastPlayedCard.rank && !hasValidCard && !card.isWild && i == 1) { // Can't be a matching color at this point, can be a matching rank, not wild
-					//cout << "Rule 2\n";
+				else if (card.rank == lastPlayedCard.rank && !hasValidCard && !card.isWild && i == 1) { // Rule 2: Not matching color, matching rank, not wild
 					hasValidCard = true;
 					playedCard = card;
 					break;
 				}
-				else if (isValidCard(card, lastPlayedCard) && !hasValidCard && i == 2) { // Can't be a matching rank or color at this point, only a wild.
-					//cout << "Rule 3\n";
+				else if (isValidCard(card, lastPlayedCard) && !hasValidCard && i == 2) { // Rule 3: Not matching color or rank, card is wild
 					hasValidCard = true;
 					playedCard = card;
 					break;
@@ -543,34 +508,92 @@ void cpuTurn(int currentPlayer, Card &lastPlayedCard, bool &canRespond, int &pot
 			}
 		}
 		if (!hasValidCard) {
-			cout << players[currentPlayer].Name <<" does not have a valid card to play. They have drawn a card.\n";
+			cout << players[currentPlayer].Name <<" does not have a valid card to play. " << players[currentPlayer].Name << " has drawn a card.\n";
 			drawCardLogic(canRespond, potentialDraw, deck, players, discardPile, currentPlayer);
+			this_thread::sleep_for(DELAY);
 			return;
 		}
 		else {
-
 			if (playedCard.isSpecial) {
-				specialCardLogic(playedCard, turnCount, iterator, potentialDraw, players, nextPlayer, canRespond, deck, discardPile);
+				specialCardLogic(playedCard, turnCount, iterator, potentialDraw, players, nextPlayer, canRespond, deck, discardPile, currentPlayer);
 			}
 			if (playedCard.isWild) {
 				playedCard.color = preferredColor;
 			}
-			//cout << "Card to play: " << cardToPlay << endl;
-			//players[currentPlayer].hand.erase(players[currentPlayer].hand.begin() + (cardToPlay - 1));
-			//playedCard.status = played;
-			////cout << players[currentPlayer].Name << " played : ";
-			//displayCard(playedCard);
-			//discardPile.push_back(playedCard);
-			//lastPlayedCard = playedCard;
 		}
 	}
 	players[currentPlayer].hand.erase(players[currentPlayer].hand.begin() + (cardToPlay - 1));
 	playedCard.status = played;
 	cout << players[currentPlayer].Name << " played : ";
 	displayCard(playedCard);
+	this_thread::sleep_for(DELAY);
 	discardPile.push_back(playedCard);
 	lastPlayedCard = playedCard;
 	
+}
+
+void botModeSpectate(vector<Player> players) {
+
+	cout << "| CURRENT HAND SIZES |" << endl;
+	for (auto player : players) {
+		cout << player.Name << ": " << player.hand.size() << endl;
+	}
+	cout << "\n\n-----------------------";
+	for (auto player : players) {
+		cout << "\nHand of " << player.Name << endl;
+		for (auto cards : player.hand) {
+			displayCard(cards);
+		}
+	}
+	cout << "\n\n-----------------------\n";
+
+}
+
+Card initRound(string& playerName, int& playerCount, vector<Player>& players, vector<Card>& deck, vector<Card>& discardPile, int& potentialDraw) {
+	cout << "Enter your name: ";
+	while (!(cin >> playerName))
+	{
+		cout << "Invalid input. Try again with a valid name";
+		cin.clear();
+		cin.ignore(10000, '\n');
+	}
+	if (playerName == "CPU0") {
+		botMode = true;
+	}
+
+	cout << "Enter the total amount of opponents you want (maximum of 10 for now): ";
+	while (!(cin >> playerCount))
+	{
+		cout << "Invalid input. Try again with ";
+		cin.clear();
+		cin.ignore(10000, '\n');
+	}
+	clearScreen();
+	cout << "Bot mode active. Enjoy the show!\n";
+	cout << "A total of " << playerCount + 1 << " players are competing. Good luck!\n" << endl;
+
+	initPlayers(players, playerName, playerCount);
+	dealCards(deck, players[0], players, playerCount, discardPile);
+	Card firstCard = draw(deck, discardPile, discardPile);
+	if (firstCard.isSpecial) {
+		while (firstCard.isSpecial) {
+			firstCard = draw(deck, discardPile, discardPile);
+		}
+		//switch (firstCard.rank) {
+		//case(drawTwo):
+		//	potentialDraw += 2;
+		//	break;
+		//case(wildCard):
+		//	firstCard.color = getRandomColor();
+		//	break;
+		//case(wildDrawFour):
+		//	firstCard.color = getRandomColor();
+		//	potentialDraw += 4;
+		//	break;
+		//}
+	}
+	firstCard.status = played;
+	return firstCard;
 }
 
 void playUno() {
@@ -593,11 +616,16 @@ void playUno() {
 	int nextPlayer = 0;
 	int currentPlayer = 0;
 	Card lastPlayedCard = initRound(playerName, playerCount, players, deck, discardPile, potentialDraw);
-
+	int round = 1;
 	while (gamePower) {
+		if (round == players.size())
+		{
+			botModeSpectate(players);
+			round = 1;
+		}
 		currentPlayer = turnCount % players.size();
 		nextPlayer = (turnCount + iterator) % players.size();
-		if (turnCount % players.size() == 0) {
+		if (turnCount % players.size() == 0 && !botMode) {
 			cout << "| CURRENT HAND SIZES |" << endl;
 			for (auto player : players) {
 				cout << player.Name << ": " << player.hand.size() << endl;
@@ -608,7 +636,6 @@ void playUno() {
 				displayCard(cards); 
 			}
 			if (devMode) {
-				
 				for (auto player : players) {
 					if (player.isCPU) {
 						cout << "\nHand of " << player.Name << " (devMode on)\n";
@@ -635,6 +662,7 @@ void playUno() {
 			if (cardToPlay > 0 && cardToPlay <= players[0].hand.size() && !canRespond) {
 				Card playedCard = players[0].hand[cardToPlay - 1];
 				if (isValidCard(playedCard, lastPlayedCard)) {
+					clearScreen();
 					playerCardLogic(players, colors, playedCard, cardToPlay, turnCount, iterator, potentialDraw, canRespond, deck, discardPile, wildColor, lastPlayedCard, nextPlayer); // 
 				}
 				else {
@@ -655,31 +683,34 @@ void playUno() {
 				}
 				continue;
 			}
-			//unoCheck(players[0].hand, gamePower);
-			//turnCount += iterator;
 		}
 		else
 		{
-			cout << "CPU's turn" << endl;
-			cpuTurn(turnCount % players.size(), lastPlayedCard, canRespond, potentialDraw, deck, discardPile, players, nextPlayer, iterator, turnCount);
+			cout << players[currentPlayer].Name << "'s turn!\n";
+			cout << "Last played card: ";
+			displayCard(lastPlayedCard);
+			if (lastPlayedCard.isWild) {
+				cout << " (Chosen color: " << lastPlayedCard.GetColor(lastPlayedCard.color) << ") \n";
+			}
 			cout << endl;
+			this_thread::sleep_for(DELAY);
+			cpuTurn(currentPlayer, lastPlayedCard, canRespond, potentialDraw, deck, discardPile, players, nextPlayer, iterator, turnCount);
+			cout << endl;
+			if (botMode) round++;
 		}
 		turnCount += iterator;
 		unoCheck(players[currentPlayer], gamePower);
-		if (!players[currentPlayer].isCPU && gamePower) {
-			clearScreen();
-		}
 	}
 }
 
 void mainMenu() {
 	string userInput;
 	bool programPower = powerOn;
-	cout << "Input \"S\" to start playing!" << endl << "At any time, input \"X\" to terminate the program.\n Input \"D\" to launch the game in dev mode (hand is all wilds by default, can be changed in deal function.)" << endl;
+	cout << "Input \"S\" to start playing!" << endl << "At any time, input \"X\" to terminate the program.\nInput \"D\" to launch the game in dev mode (hand is all wilds by default, can be changed in deal function.)" << endl;
 	while (programPower) {
 		cout << ">> ";
 		cin >> userInput;
-		switch (userInput[0]) {
+		switch (toupper(userInput[0])) {
 		case(START):
 			clearScreen();
 			cout << "Game starting..." << endl;
