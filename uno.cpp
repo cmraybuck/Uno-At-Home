@@ -6,6 +6,8 @@
 #include "macros.h"
 using namespace std;
 
+
+
 // Red, Yellow, Green, Blue
 // 0, 1, 2, 3, 4, 5, 6, 7, 8, 9
 // Specials: Reverse, Skip, Draw 2
@@ -26,7 +28,7 @@ public:
 		isSpecial = s;
 		status = p;
 	}
-	string GetColor(char color) { 
+	string GetColor(char color) {
 		switch (color) {
 		case(YELLOW):
 			return "Yellow";
@@ -48,6 +50,42 @@ public:
 		}
 	}
 };
+
+class Player
+{
+public:
+	string Name;
+	bool isCPU;
+	vector<Card> hand;
+
+	Player(string whatName, bool whatType)
+	{
+		Name = whatName;
+		isCPU = whatType;
+	}
+
+	~Player()
+	{
+		//cout << "Destructor called" << endl; 
+	}
+};
+
+void initPlayers(vector<Player>& players, string playName, int numOpp = 2)
+{
+	cout << "PLAYERS\n";
+	cout << "-----------------\n";
+	players.emplace_back(playName, userPlayer);
+	string oppName = "CPU";
+	cout << "> " << playName << endl;
+	for (int x = 1; x <= numOpp; x++)
+	{
+		oppName += to_string(x);
+		cout << "> " << oppName << endl;
+		players.emplace_back(oppName, botPlayer);
+		oppName.pop_back();
+	}
+	cout << "-----------------\n";
+}
 
 vector<Card> createDeck() {
 	vector<Card> deck;
@@ -164,12 +202,26 @@ Card draw(vector<Card>& deck, vector<Card>& hand, vector<Card>& discardPile) {
 	return drawCard;
 }
 
-void dealCards(vector<Card>& deck, vector<Card>& playerHand, vector<Card>& opponentHand) {
-	for (int i = 0; i < 7; i++) {
-		Card cardDrawn = draw(deck, playerHand, playerHand); // Need to remove 3rd parameter here and on other function call below, putting a bandage on this for now
+void dealCards(vector<Card>& deck, Player& humanPlayer, vector<Player>& players, int numOpp, vector<Card>& discardPile) {
+	
+	if (devMode) {
+		Card devWildCard = Card(wildCard, WILD_COLOR, wild, special, notPlayed);
+		for (int i = 0; i < 7; i++) {
+			humanPlayer.hand.push_back(devWildCard);
+		}
+		
 	}
-	for (int i = 0; i < 7; i++) {
-		Card cardDrawn = draw(deck, opponentHand, opponentHand);
+	else {
+		for (int i = 0; i < 7; i++) {
+			draw(deck, humanPlayer.hand, discardPile);
+		}
+	}
+
+
+	for (int x = 0; x < numOpp; x++) {
+		for (int i = 0; i < 7; i++) {
+			draw(deck, players[x + 1].hand, discardPile);
+		}
 	}
 }
 
@@ -188,18 +240,187 @@ char getRandomColor() {
 	return validColors[dist(engine)];
 }
 
-bool unoCheck(vector<Card> playerHand, bool &gamePower) {
+void clearScreen() {
+	// \033[2J clears the screen
+	// \033[1;1H moves the cursor to the top-left corner
+	cout << CLEAR_SCREEN;
+}
+bool unoCheck(vector<Card> playerHand, bool& gamePower) {
 	if (playerHand.size() == UNO) {
 		cout << "UNO! One more card to win!" << endl;
 	}
 	else if (playerHand.size() < UNO) {
-		cout << "Player wins!" << endl << "Thanks for playing!" << endl;
+		cout << "========================================" << endl;
+		cout << "       CONGRATULATIONS! YOU WIN!        \n";
+		cout << "========================================" << endl;
 		gamePower = powerOff;
 	}
 	return gamePower;
 }
 
+void cpuTurn(int num) {
+}
+
+Card roundInitialization(string &playerName, int &playerCount, vector<Player> &players, vector<Card>& deck, vector<Card>& discardPile, int &potentialDraw) {
+	cout << "Enter your name: ";
+	while (!(cin >> playerName))
+	{
+		cout << "Invalid input. Try again with a valid name";
+		cin.clear();
+		cin.ignore(10000, '\n');
+	}
+
+	cout << "Enter the total amount of opponents you want" << endl;
+	while (!(cin >> playerCount))
+	{
+		cout << "Invalid input. Try again with ";
+		cin.clear();
+		cin.ignore(10000, '\n');
+	}
+	cout << "A total of " << playerCount + 1 << " players are competing. Good luck!\n" << endl;
+
+	initPlayers(players, playerName, playerCount);
+	dealCards(deck, players[0], players, playerCount, discardPile);
+	Card lastPlayedCard = draw(deck, discardPile, discardPile);
+	lastPlayedCard.status = played;
+	switch (lastPlayedCard.rank) {
+	case(drawTwo):
+		potentialDraw += 2;
+		break;
+	case(wildCard):
+		lastPlayedCard.color = getRandomColor();
+		break;
+	case(wildDrawFour):
+		lastPlayedCard.color = getRandomColor();
+		potentialDraw += 4;
+		break;
+	}
+	return lastPlayedCard;
+}
+
+void welcomeScreen() {
+	cout << "========================================" << endl;
+	// Raw String Literal R"( ... )" handles the spacing automatically
+	cout << R"(
+       UU   UU   NN   NN    OOOOO
+       UU   UU   NNN  NN   OO   OO
+       UU   UU   NN N NN   OO   OO
+       UU   UU   NN  NNN   OO   OO
+        OUUUO    NN   NN    OOOOO
+					)" << endl;
+
+	cout << "========================================" << endl;
+	cout << "            WELCOME TO UNO!             " << endl;
+	cout << "========================================" << endl;
+	//cout << "Player wins!" << endl << "Thanks for playing!" << endl;
+	return;
+}
+
+void topDiscardInfo(Card lastPlayedCard, int potentialDraw) {
+	cout << endl << "Current Card: ";
+	displayCard(lastPlayedCard);
+	if (lastPlayedCard.isWild) {
+		cout << "\nWild card color: " << lastPlayedCard.GetColor(lastPlayedCard.color);
+	}
+	switch (lastPlayedCard.rank) {
+	case(drawTwo):
+		cout << "\nOpponent played a draw two! You must play a draw two from your hand or input 0 to draw " << potentialDraw << " cards and pass your turn.\n";
+		break;
+	case(wildDrawFour):
+		cout << "\nOpponent played a draw four! You must play a draw four from your hand or input 0 to draw " << potentialDraw << " cards and pass your turn.\n";
+		break;
+	default:
+		break;
+	}
+}
+
+void playerCardLogic(vector<Player> &players, string colors, Card &playedCard, 
+				int &cardToPlay, int &turnCount, int &iterator, 
+				int &potentialDraw, bool &canRespond, vector<Card> &deck, 
+				vector<Card> &discardPile, string &wildColor, Card &lastPlayedCard,
+				int &nextPlayer) {
+	players[0].hand.erase(players[0].hand.begin() + (cardToPlay - 1));
+	playedCard.status = played;
+	if (playedCard.isWild) {
+		cout << "WILD CARD! Select your color (R,G,B,Y): ";
+		while (true) {
+			cin >> wildColor;
+			if (colors.find(toupper(wildColor[0])) != string::npos) {
+				playedCard.color = toupper(wildColor[0]);
+				break;
+			}
+			else {
+				cout << "Please enter a valid color letter (R,G,B,Y): ";
+			}
+		}
+	}
+	if (playedCard.isSpecial) {
+		switch (playedCard.rank) {
+		case(skip):
+			turnCount += iterator;
+			break;
+		case(reverse): // Reverse turn order array or iterator
+			iterator *= -1;
+			break;
+		case(drawTwo): // Force other player to draw two cards unless they can stack a draw 2. If they draw, the turn is skipped.
+			cout << "Next player: " << nextPlayer << endl;
+			potentialDraw += 2;
+			for (auto card : players[nextPlayer].hand) {
+				if (card.rank == drawTwo) {
+					canRespond = true;
+					break;
+				}
+			}
+			if (!canRespond) {
+				canRespond = false;
+				for (int i = 0; i < potentialDraw; i++) {
+					draw(deck, players[nextPlayer].hand, discardPile);
+				}
+				potentialDraw = 0;
+				turnCount += iterator;
+			}
+			break;
+		case(wildDrawFour):
+			potentialDraw += 4;
+			for (auto card : players[nextPlayer].hand) {
+				if (card.rank == wildDrawFour) {
+					canRespond = true;
+					break;
+				}
+			}
+			if (!canRespond) {
+				canRespond = false;
+				for (int i = 0; i < potentialDraw; i++) {
+					draw(deck, players[nextPlayer].hand, discardPile);
+				}
+				potentialDraw = 0;
+				turnCount += iterator;
+			}
+			break;
+		default:
+			break;
+		}
+	}
+	discardPile.push_back(playedCard);
+	lastPlayedCard = playedCard;
+}
+
+void drawCardLogic(bool &canRespond, int &potentialDraw, vector<Card> &deck, vector<Player> &players, vector<Card> &discardPile) {
+	if (canRespond) {
+		for (int i = 0; i < potentialDraw; i++) {
+			draw(deck, players[0].hand, discardPile);
+		}
+		potentialDraw = 0;
+		canRespond = false;
+	}
+	else {
+		draw(deck, players[0].hand, discardPile);
+	}
+}
+
 void playUno() {
+	welcomeScreen();
+	int potentialDraw = 0;
 	int cardToPlay;
 	bool gamePower = powerOn;
 	bool validCardPlayed;
@@ -209,85 +430,77 @@ void playUno() {
 	vector<Card> discardPile;
 	vector<Card> playerHand;
 	vector<Card> opponentHand;
-	dealCards(deck, playerHand, opponentHand);
-	Card lastPlayedCard = draw(deck, discardPile, discardPile);
-	lastPlayedCard.status = played; 
-	if (lastPlayedCard.isWild) {
-		lastPlayedCard.color = getRandomColor(); 
-	}
+	int iterator = 1;
+	bool canRespond = false;
+	string playerName;
+	int playerCount = 0;
+	vector<Player> players;
+	int turnCount = players.size() * 50;
+	int nextPlayer = 0;
+
+	Card lastPlayedCard = roundInitialization(playerName, playerCount, players, deck, discardPile, potentialDraw);
 	while (gamePower) {
-		cout << endl << "Current Card: ";
-		displayCard(lastPlayedCard);
-		if (lastPlayedCard.isWild) {
-			cout << "\nWild card color: " << lastPlayedCard.GetColor(lastPlayedCard.color);
-		}
-		cout << endl << "Your hand: " << endl;
-		for (auto cards : playerHand) {
-			displayCard(cards);
-		}
-		cout << "\nChoose a card number to play (or 0 to draw): ";
-		if (!(cin >> cardToPlay)) {
-			cin.clear();
-			cin.ignore(numeric_limits<streamsize>::max(), '\n');
-			cout << "Invalid input! Please enter a number." << endl;
-			continue; 
-		}
-		if (cardToPlay > 0 && cardToPlay <= playerHand.size()) {
-			Card playedCard = playerHand[cardToPlay - 1];
-			if (isValidCard(playedCard, lastPlayedCard)) {
-				playerHand.erase(playerHand.begin() + (cardToPlay - 1));
-				playedCard.status = played;
-				if (playedCard.isWild) {
-					cout << "WILD CARD! Select your color (R,G,B,Y): ";
-					while (true) { 
-						cin >> wildColor; 
-						if (colors.find(toupper(wildColor[0])) != string::npos) {
-							playedCard.color = toupper(wildColor[0]);
-							break;
-						}
-						else {
-							cout << "Please enter a valid color letter (R,G,B,Y): ";
-						}
-					}
-				}
-				if (playedCard.isSpecial) {
-					switch (playedCard.rank) {
-					case(skip): // Set skip turn var to true
-						break;
-					case(reverse): // Reverse turn order array or iterator
-						break;
-					case(drawTwo): // Force other player to draw two cards unless they can stack a draw 2. If they draw, the turn is skipped.
-						break;
-					case(wildDrawFour): // Force other player to draw four cards unless they can stack a draw 4. If they draw, the turn is skipped.
-						break;
-					default:
-						break;
-					}
-				}
-				discardPile.push_back(playedCard);
-				lastPlayedCard = playedCard;
+		//cout << players[turnCount % players.size()].Name << "'s turn!\n";
+		if (turnCount % players.size() == 0) {
+			nextPlayer = (turnCount + iterator) % players.size();
+			topDiscardInfo(lastPlayedCard, potentialDraw);
+			cout << endl << "Your hand: " << endl;
+			for (auto cards : players[0].hand) {
+				displayCard(cards);
 			}
-			else {
-				cout << "Invalid play! Select another card or draw to pass your turn." << endl;
+			cout << "\nChoose a card number to play (or 0 to draw): ";
+			if (!(cin >> cardToPlay)) {
+				cin.clear();
+				cin.ignore(numeric_limits<streamsize>::max(), '\n');
+				cout << "Invalid input! Please enter a number." << endl;
 				continue;
 			}
+
+			if (canRespond && cardToPlay > 0) {
+				Card playedCard = players[0].hand[cardToPlay - 1];
+				if (playedCard.rank == lastPlayedCard.rank) {
+					canRespond = false;
+				}
+			}
+			if (cardToPlay > 0 && cardToPlay <= players[0].hand.size() && !canRespond) {
+				Card playedCard = players[0].hand[cardToPlay - 1];
+				if (isValidCard(playedCard, lastPlayedCard)) {
+					playerCardLogic(players, colors, playedCard, cardToPlay, turnCount, iterator, potentialDraw, canRespond, deck, discardPile, wildColor, lastPlayedCard, nextPlayer);
+				}
+				else {
+					cout << "Invalid play! Select another card or draw to pass your turn." << endl;
+					continue;
+				}
+			}
+			else if (!cardToPlay) {
+				drawCardLogic(canRespond, potentialDraw, deck, players, discardPile);
+			}
+			else {
+				if (canRespond) {
+					cout << "\nInvalid play!\nYou must play a card with the same draw effect as the one just played or input 0 to draw " << potentialDraw << "cards!\n";
+				}
+				else {
+					cout << "\nInvalid play!\n"; 
+				}
+				continue;
+			}
+			clearScreen();
+			unoCheck(players[0].hand, gamePower);
+			turnCount += iterator;
 		}
-		else if (!cardToPlay) {
-			draw(deck, playerHand, discardPile);
+		else
+		{
+			//cpuTurn(turnCount % players.size());
+			cout << "Skipping opponents turn for now." << endl;
+			turnCount += iterator;
 		}
-		else {
-			cout << "Invalid input" << endl; // Temporary way to ensure valid inputs and exit program if needed. Add "continue" below this later to avoid passing turn
-			gamePower = powerOff;
-		}
-		unoCheck(playerHand, gamePower);
-		// pass turn if hand is valid
 	}
 }
 
 void mainMenu() {
 	string userInput;
 	bool programPower = powerOn;
-	cout << "| Welcome to UNO! |" << endl << "Input \"S\" to start playing!" << endl << "At any time, input \"X\" to terminate the program." << endl;
+	cout << "Input \"S\" to start playing!" << endl << "At any time, input \"X\" to terminate the program.\n Input \"D\" to launch the game in dev mode (hand is all wilds by default, can be changed in deal function.)" << endl;
 	while (programPower) {
 		cout << ">> ";
 		cin >> userInput;
@@ -299,6 +512,12 @@ void mainMenu() {
 			break;
 		case(TERMINATE):
 			cout << "Terminating program... Thanks for playing!" << endl;
+			programPower = powerOff;
+			break;
+		case(DEV_MODE):
+			cout << "Game starting in dev mode..." << endl;
+			devMode = true;
+			playUno();
 			programPower = powerOff;
 			break;
 		default:
