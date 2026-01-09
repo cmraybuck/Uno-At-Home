@@ -22,7 +22,17 @@
 #define PURPLE_TEXT "\033[35m"
 #define ORANGE_TEXT "\033[38;5;208m"
 #define RESET_TEXT   "\033[0m"
+#define CLEAR_SCREEN "\033[2J\033[1;1H"
 #define UNO (1)
 #define WILD_COLOR 'W'
 #define START 'S'
 #define TERMINATE 'X'
+#define userPlayer false
+#define botPlayer true
+#define DEV_MODE 'D'
+#define BOT_MODE_CODE
+bool devMode = false;
+bool botMode = false;
+#define HUMAN (0)
+#define STARTING_HAND_SIZE (7)
+#define DELAY (1s)
